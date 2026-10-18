@@ -35,8 +35,11 @@ test {
         // Fixtures run only through EngineTestKit inside other tests.
         excludeTags 'fixture'
     }
-    environment 'LODESTONE_TESTKIT_CONFIG', file('src/test/resources/unreachable-panel.json').absolutePath
-    environment 'LODESTONE_TESTKIT_WARNINGS', layout.buildDirectory.file('testkit-warnings.txt').get().asFile.absolutePath
+    // InfraDownTest needs a dead panel; live runs pass their own config and skip it.
+    if (!System.getenv('LODESTONE_TESTKIT_LIVE')) {
+        environment 'LODESTONE_TESTKIT_CONFIG', file('src/test/resources/unreachable-panel.json').absolutePath
+        environment 'LODESTONE_TESTKIT_WARNINGS', layout.buildDirectory.file('testkit-warnings.txt').get().asFile.absolutePath
+    }
 }
 
 // The bot (MCProtocolLib, pinned to a timestamped 26.3 snapshot) ships nested, loaded child-first at runtime

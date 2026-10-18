@@ -2,6 +2,7 @@ package gg.lode.testkit;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.junit.platform.testkit.engine.EngineTestKit;
 import org.junit.platform.testkit.engine.Events;
 
@@ -13,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
 
 /** A panel that can't be reached must skip every server invocation with a warning, never fail the build. */
+@DisabledIfEnvironmentVariable(named = "LODESTONE_TESTKIT_LIVE", matches = ".+")
 class InfraDownTest {
 
     @Test

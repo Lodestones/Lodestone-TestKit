@@ -25,14 +25,33 @@ final class PanelClient {
 
     private final String base;
     private final String key;
+    private final String host;
+    private final String wingsUrl;
+    private final String origin;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
-    PanelClient(String panelUrl, String clientKey) {
+    PanelClient(String panelUrl, String clientKey, String panelHost, String wingsUrl) {
         this.base = panelUrl + "/api/client/servers/";
         this.key = clientKey;
+        this.host = panelHost;
+        this.wingsUrl = wingsUrl;
+        // Wings only accepts websocket connections whose Origin is the panel's public URL.
+        this.origin = panelHost != null ? "https://" + panelHost : panelUrl;
+    }
+
+    String origin() {
+        return origin;
+    }
+
+    /** Points a Wings URL handed out by the panel at {@code wingsUrl}, keeping path and query. */
+    String toWings(String url) {
+        if (wingsUrl == null) return url;
+        URI u = URI.create(url);
+        String scheme = u.getScheme().startsWith("ws") ? wingsUrl.replaceFirst("^http", "ws") : wingsUrl;
+        return scheme + u.getRawPath() + (u.getRawQuery() != null ? "?" + u.getRawQuery() : "");
     }
 
     HttpClient http() {
@@ -70,7 +89,9 @@ final class PanelClient {
 
     /** Websocket URL and token for the live console. */
     JsonObject websocket(String server) {
-        return get(server + "/websocket").getAsJsonObject("data");
+        JsonObject data = get(server + "/websocket").getAsJsonObject("data");
+        data.addProperty("socket", toWings(data.get("socket").getAsString()));
+        return data;
     }
 
     List<String> list(String server, String dir) {
@@ -104,8 +125,20 @@ final class PanelClient {
     String read(String server, String file) {
         HttpResponse<String> res = request(HttpRequest.newBuilder(URI.create(base + server + "/files/contents?file=" + enc(file))).GET());
         if (res.statusCode() == 404) return null;
+        // The panel turns Wings' "file not found" into a 500, so look before calling it an outage.
+        if (res.statusCode() == 500 && !exists(server, file)) return null;
         check(res);
         return res.body();
+    }
+
+    private boolean exists(String server, String file) {
+        int slash = file.lastIndexOf('/');
+        String dir = slash <= 0 ? "/" : file.substring(0, slash);
+        try {
+            return list(server, dir).contains(file.substring(slash + 1));
+        } catch (IllegalStateException missingDir) {
+            return false;
+        }
     }
 
     void write(String server, String file, String content) {
@@ -117,7 +150,7 @@ final class PanelClient {
 
     /** Uploads one local file into {@code directory} through Wings' signed upload URL. */
     void upload(String server, Path file, String directory) {
-        String url = get(server + "/files/upload").getAsJsonObject("attributes").get("url").getAsString();
+        String url = toWings(get(server + "/files/upload").getAsJsonObject("attributes").get("url").getAsString());
         String boundary = "testkit" + UUID.randomUUID().toString().replace("-", "");
         byte[] head = ("--" + boundary + "\r\nContent-Disposition: form-data; name=\"files\"; filename=\""
                 + file.getFileName() + "\"\r\nContent-Type: application/octet-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8);
@@ -157,6 +190,7 @@ final class PanelClient {
     }
 
     private HttpResponse<String> request(HttpRequest.Builder builder) {
+        if (host != null) builder.header("Host", host);
         HttpRequest req = builder.timeout(Duration.ofSeconds(30))
                 .header("Authorization", "Bearer " + key)
                 .header("Accept", "application/json")

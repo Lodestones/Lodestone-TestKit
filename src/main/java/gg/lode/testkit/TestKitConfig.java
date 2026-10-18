@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
  * {
  *   "panelUrl": "https://panel.lode.gg",
  *   "clientKey": "ptlc_...",
+ *   "panelHost": "panel.lode.gg",       // optional: Host header when panelUrl is a local address
+ *   "wingsUrl": "http://127.0.0.1:8080", // optional: reach Wings directly instead of its public URL
  *   "servers": [
  *     { "id": "1.21.6", "uuid": "1a2b3c4d", "host": "15.204.154.132", "port": 25901, "platform": "paper", "mc": "1.21.6" }
  *   ]
@@ -37,12 +39,17 @@ public final class TestKitConfig {
 
     private final String panelUrl;
     private final String clientKey;
+    private final String panelHost;
+    private final String wingsUrl;
     private final Map<String, ServerSpec> servers;
     private final Path cacheDir;
 
-    private TestKitConfig(String panelUrl, String clientKey, Map<String, ServerSpec> servers, Path cacheDir) {
+    private TestKitConfig(String panelUrl, String clientKey, String panelHost, String wingsUrl,
+                          Map<String, ServerSpec> servers, Path cacheDir) {
         this.panelUrl = panelUrl;
         this.clientKey = clientKey;
+        this.panelHost = panelHost;
+        this.wingsUrl = wingsUrl;
         this.servers = servers;
         this.cacheDir = cacheDir;
     }
@@ -77,8 +84,14 @@ public final class TestKitConfig {
                     o.get("port").getAsInt(), string(o, "platform"), string(o, "mc"));
             servers.put(spec.id(), spec);
         }
+        String panelHost = string(root, "panelHost");
+        if (panelHost != null) {
+            // Host is a restricted header in java.net.http; it has to be unlocked before the first client is built.
+            System.setProperty("jdk.httpclient.allowRestrictedHeaders", "host");
+        }
+        String wingsUrl = string(root, "wingsUrl");
         String cache = string(root, "cacheDir");
-        return new TestKitConfig(stripSlash(panelUrl), clientKey, servers,
+        return new TestKitConfig(stripSlash(panelUrl), clientKey, panelHost, wingsUrl != null ? stripSlash(wingsUrl) : null, servers,
                 cache != null ? Path.of(cache) : home().resolve("cache"));
     }
 
@@ -88,6 +101,16 @@ public final class TestKitConfig {
 
     String clientKey() {
         return clientKey;
+    }
+
+    /** Host header for panel requests, or null to use the one in {@link #panelUrl()}. */
+    String panelHost() {
+        return panelHost;
+    }
+
+    /** Base URL that replaces the public Wings address in socket and upload URLs, or null. */
+    String wingsUrl() {
+        return wingsUrl;
     }
 
     public Path cacheDir() {

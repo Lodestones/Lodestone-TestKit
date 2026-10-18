@@ -59,17 +59,31 @@ final class ServerSession implements TestServer, AutoCloseable {
     }
 
     void start() {
-        panel.checkUsable(spec.uuid());
-        acquireLock();
-        console = new PanelConsole(panel, spec.uuid(), config.panelUrl());
-        console.open();
-        stopServer();
-        resetFiles();
-        uploadPlugins();
-        runHooks();
-        bootMark = console.mark();
-        panel.power(spec.uuid(), "start");
-        awaitBoot();
+        phase("check", () -> panel.checkUsable(spec.uuid()));
+        phase("lock", this::acquireLock);
+        phase("console", () -> {
+            console = new PanelConsole(panel, spec.uuid());
+            console.open();
+        });
+        phase("stop", this::stopServer);
+        phase("reset", this::resetFiles);
+        phase("upload", this::uploadPlugins);
+        phase("hooks", this::runHooks);
+        phase("boot", () -> {
+            bootMark = console.mark();
+            panel.power(spec.uuid(), "start");
+            awaitBoot();
+        });
+    }
+
+    /** Times each setup step so a slow CI run shows where the minutes went. */
+    private void phase(String name, Runnable step) {
+        long started = System.nanoTime();
+        try {
+            step.run();
+        } finally {
+            System.err.printf("[TestKit] %s %s %.1fs%n", spec.id(), name, (System.nanoTime() - started) / 1e9);
+        }
     }
 
     // ---------------------------------------------------------------- lifecycle
@@ -121,7 +135,9 @@ final class ServerSession implements TestServer, AutoCloseable {
 
     private void resetFiles() {
         List<String> root = panel.list(spec.uuid(), "/");
-        List<String> wipe = new ArrayList<>(List.of("plugins", "logs", "crash-reports"));
+        // Player lists go too, so an op or ban from one run never leaks into the next.
+        List<String> wipe = new ArrayList<>(List.of("plugins", "logs", "crash-reports",
+                "ops.json", "whitelist.json", "banned-players.json", "banned-ips.json", "usercache.json"));
         if (!spec.isProxy()) wipe.addAll(List.of("world", "world_nether", "world_the_end"));
         wipe.retainAll(root);
         panel.delete(spec.uuid(), "/", wipe);

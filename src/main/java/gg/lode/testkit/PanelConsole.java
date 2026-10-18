@@ -25,23 +25,21 @@ final class PanelConsole implements AutoCloseable {
 
     private final PanelClient panel;
     private final String server;
-    private final String panelUrl;
     private final List<String> lines = new ArrayList<>();
     private volatile String state = "unknown";
     private volatile WebSocket socket;
     private volatile boolean closed;
 
-    PanelConsole(PanelClient panel, String server, String panelUrl) {
+    PanelConsole(PanelClient panel, String server) {
         this.panel = panel;
         this.server = server;
-        this.panelUrl = panelUrl;
     }
 
     void open() {
         JsonObject info = panel.websocket(server);
         try {
             socket = panel.http().newWebSocketBuilder()
-                    .header("Origin", panelUrl)
+                    .header("Origin", panel.origin())
                     .connectTimeout(Duration.ofSeconds(15))
                     .buildAsync(URI.create(info.get("socket").getAsString()), new Listener())
                     .get(20, TimeUnit.SECONDS);

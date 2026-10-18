@@ -31,7 +31,7 @@ final class SessionRegistry implements ExtensionContext.Store.CloseableResource,
 
     SessionRegistry(TestKitConfig config) {
         this.config = config;
-        this.panel = new PanelClient(config.panelUrl(), config.clientKey());
+        this.panel = new PanelClient(config.panelUrl(), config.clientKey(), config.panelHost(), config.wingsUrl());
     }
 
     TestKitConfig config() {
