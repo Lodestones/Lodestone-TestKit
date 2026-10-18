@@ -1,0 +1,55 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+group = 'gg.lode'
+version = '0.1.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    api platform('org.junit:junit-bom:5.13.4')
+    api 'org.junit.jupiter:junit-jupiter-api'
+    implementation 'com.google.code.gson:gson:2.13.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.junit.platform:junit-platform-testkit'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+test {
+    useJUnitPlatform {
+        // Fixtures run only through EngineTestKit inside other tests.
+        excludeTags 'fixture'
+    }
+    environment 'LODESTONE_TESTKIT_CONFIG', file('src/test/resources/unreachable-panel.json').absolutePath
+    environment 'LODESTONE_TESTKIT_WARNINGS', layout.buildDirectory.file('testkit-warnings.txt').get().asFile.absolutePath
+}
+
+// The bot (MCProtocolLib, pinned to a timestamped 26.3 snapshot) ships nested, loaded child-first at runtime
+// so its Adventure/Netty/Gson never meet the plugin's own on the test classpath.
+processResources {
+    dependsOn ':bot:shadowJar'
+    from(project(':bot').layout.buildDirectory.file('libs/testkit-bot.jar'))
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
+}

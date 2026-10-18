@@ -1,0 +1,33 @@
+// The fake-player bot and MCProtocolLib, packed as one jar that the TestKit loads in its own classloader.
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.opencollab.dev/main/' }
+}
+
+dependencies {
+    // The bot API lives in the TestKit itself and is shared with this jar at runtime.
+    compileOnly files(rootProject.sourceSets.main.output.classesDirs)
+    implementation 'org.geysermc.mcprotocollib:protocol:26.3-20261014.110736-14'
+}
+
+tasks.named('compileJava') {
+    dependsOn ':compileJava'
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+shadowJar {
+    archiveFileName = 'testkit-bot.jar'
+    // The API classes come from the parent classloader.
+    exclude 'gg/lode/testkit/bot/**'
+    mergeServiceFiles()
+}

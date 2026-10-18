@@ -1,0 +1,13 @@
+.gradle/
+build/
+bot/build/
+out/
+.idea/
+*.iml
+.DS_Store
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+# local TestKit config can hold a panel key
+config.json
+*.md
+!README.md
