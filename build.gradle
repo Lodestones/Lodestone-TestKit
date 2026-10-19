@@ -3,8 +3,9 @@ plugins {
     id 'maven-publish'
 }
 
-group = 'gg.lode'
-version = '0.1.0'
+// Matches the coordinates JitPack publishes, so a local publish stands in for it.
+group = 'com.github.Lodestones'
+version = '0.1.1'
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }

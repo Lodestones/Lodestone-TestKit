@@ -33,7 +33,9 @@ public @interface LodestoneServers {
 
     /**
      * Plugins to install, in order. See {@link PluginSource} for the accepted forms:
-     * {@code self}, {@code file:<path>}, {@code url:<https url>}, {@code modrinth:<slug>}, {@code lode:<plugin id>}.
+     * {@code self}, {@code self:<key>}, {@code file:<path>}, {@code url:<https url>}, {@code modrinth:<slug>},
+     * {@code lode:<plugin id>}. {@code self} is the {@code testkit.plugin} jar, or {@code testkit.plugin.velocity} on a
+     * proxy when that is set.
      */
     String[] plugins() default {"self"};
 

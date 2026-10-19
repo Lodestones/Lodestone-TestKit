@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Turns a plugin spec from {@link LodestoneServers#plugins()} into local jar files.
@@ -46,17 +47,38 @@ final class PluginSource {
     private PluginSource() {
     }
 
+    /** The one plugin jar in a build output folder, skipping shade's original-*, sources and javadoc jars. */
+    private static Path builtJar(Path dir) {
+        try (Stream<Path> files = Files.list(dir)) {
+            List<Path> jars = files.filter(f -> {
+                String n = f.getFileName().toString();
+                return n.endsWith(".jar") && !n.startsWith("original-") && !n.endsWith("-sources.jar") && !n.endsWith("-javadoc.jar");
+            }).toList();
+            if (jars.size() != 1) {
+                throw new IllegalStateException("Expected one plugin jar in " + dir + ", found " + jars + " (build it first)");
+            }
+            return jars.getFirst();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not list " + dir, e);
+        }
+    }
+
     static List<Path> resolve(String spec, ServerSpec server, Path cache) {
-        if (spec.equals("self")) {
-            String prop = System.getProperty("testkit.plugin");
+        if (spec.equals("self") || spec.startsWith("self:")) {
+            // self:<key> reads testkit.plugin.<key>; plain self on a proxy prefers testkit.plugin.velocity, so one
+            // test class can cover a plugin that ships a Paper jar and a Velocity jar.
+            String key = spec.startsWith("self:") ? "testkit.plugin." + spec.substring(5)
+                    : server.isProxy() && System.getProperty("testkit.plugin.velocity") != null ? "testkit.plugin.velocity"
+                    : "testkit.plugin";
+            String prop = System.getProperty(key);
             if (prop == null || prop.isBlank()) {
-                throw new IllegalStateException("'self' needs the testkit.plugin system property pointing at the built jar");
+                throw new IllegalStateException("'" + spec + "' needs the " + key + " system property pointing at the built jar");
             }
             List<Path> jars = new ArrayList<>();
             for (String p : prop.split(",")) {
                 Path path = Path.of(p.trim());
-                if (!Files.isRegularFile(path)) throw new IllegalStateException("testkit.plugin jar missing: " + path);
-                jars.add(path);
+                jars.add(Files.isDirectory(path) ? builtJar(path) : path);
+                if (!Files.isRegularFile(jars.getLast())) throw new IllegalStateException(key + " jar missing: " + path);
             }
             return jars;
         }
