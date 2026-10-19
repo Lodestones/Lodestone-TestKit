@@ -220,8 +220,6 @@ final class ServerSession implements TestServer, AutoCloseable {
                 LoaderBundle bundle = LoaderBundle.of(single(loader), single(impl), blobMagic);
                 upload(bundle.loaderJar(), "plugins");
                 upload(bundle.blob(), ".cache");
-                writeFile("plugins/" + bundle.name() + "/config.yml",
-                        "loader_version: auto\nloader_channels: release\nauto_update_loader: false\n");
             }
 
             private Path single(String pluginSpec) {

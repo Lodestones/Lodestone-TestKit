@@ -16,8 +16,10 @@ public interface ServerPrep {
 
     /**
      * Installs a Lodestone cloud loader that boots {@code impl} instead of fetching from lode.gg. The loader jar gets
-     * throwaway keys, the impl is sealed with them into the server's {@code .cache} folder, and loader self-update is
-     * turned off. Both arguments take the {@link LodestoneServers#plugins()} forms, so
+     * throwaway keys and the impl is sealed with them into the server's {@code .cache} folder. lode.gg rejects the
+     * throwaway token, which also keeps the loader from updating itself. Works for loaders that fall back to their
+     * cache when lode.gg refuses them (Bookshelf, Amplifier, Chain, Frame, Name-Tag, Sign), not for Loader-Core
+     * loaders, which treat a refusal as a licence verdict. Both arguments take the {@link LodestoneServers#plugins()} forms, so
      * {@code installLoader("lode:bookshelf", "self", "BSBLOB")} tests the published loader against the build.
      *
      * @param blobMagic the loader's blob envelope magic, such as {@code BSBLOB}
