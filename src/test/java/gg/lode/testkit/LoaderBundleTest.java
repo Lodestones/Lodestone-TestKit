@@ -77,6 +77,17 @@ class LoaderBundleTest {
     }
 
     @Test
+    void readsTheNameFromAPaperPluginDescriptor() throws Exception {
+        Path loader = jar("Paper-Loader.jar", Map.of(
+                "paper-plugin.yml", "name: Sign\nmain: x.Loader\n",
+                "cloud/aes.key", "a",
+                "cloud/ed25519-public.key", "p",
+                "cloud/loader-token.key", "t"));
+        Path impl = jar("Paper-Impl.jar", Map.of("x/Impl.class", "impl"));
+        assertEquals("Sign", LoaderBundle.of(loader, impl, "SGBLOB").name());
+    }
+
+    @Test
     void refusesAJarWithoutLoaderKeys() throws Exception {
         Path plain = jar("Plain.jar", Map.of("plugin.yml", "name: Plain\n"));
         Path impl = jar("Impl.jar", Map.of("a", "b"));

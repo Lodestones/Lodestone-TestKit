@@ -47,12 +47,13 @@ final class PluginSource {
     private PluginSource() {
     }
 
-    /** The one plugin jar in a build output folder, skipping shade's original-*, sources and javadoc jars. */
+    /** The one plugin jar in a build output folder, skipping shade's original-*, slim, sources and javadoc jars. */
     private static Path builtJar(Path dir) {
         try (Stream<Path> files = Files.list(dir)) {
             List<Path> jars = files.filter(f -> {
                 String n = f.getFileName().toString();
-                return n.endsWith(".jar") && !n.startsWith("original-") && !n.endsWith("-sources.jar") && !n.endsWith("-javadoc.jar");
+                return n.endsWith(".jar") && !n.startsWith("original-") && !n.endsWith("-slim.jar")
+                        && !n.endsWith("-sources.jar") && !n.endsWith("-javadoc.jar");
             }).toList();
             if (jars.size() != 1) {
                 throw new IllegalStateException("Expected one plugin jar in " + dir + ", found " + jars + " (build it first)");

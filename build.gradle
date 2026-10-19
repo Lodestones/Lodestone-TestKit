@@ -5,7 +5,7 @@ plugins {
 
 // Matches the coordinates JitPack publishes, so a local publish stands in for it.
 group = 'com.github.Lodestones'
-version = '0.1.2'
+version = '0.1.3'
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }

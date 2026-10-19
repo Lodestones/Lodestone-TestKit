@@ -87,7 +87,8 @@ record LoaderBundle(Path loaderJar, Path blob, String name) {
                     data = keys.get(entry.getName());
                     replaced++;
                 }
-                if (entry.getName().equals("plugin.yml")) {
+                // Paper plugins ship paper-plugin.yml instead, with the same name field.
+                if (name == null && (entry.getName().equals("plugin.yml") || entry.getName().equals("paper-plugin.yml"))) {
                     Matcher m = NAME.matcher(new String(data, StandardCharsets.UTF_8));
                     if (m.find()) name = m.group(1);
                 }
@@ -99,7 +100,7 @@ record LoaderBundle(Path loaderJar, Path blob, String name) {
         if (replaced != KEYS.size()) {
             throw new IllegalStateException(from.getFileName() + " is not a Lodestone cloud loader (no " + KEYS + ")");
         }
-        if (name == null) throw new IllegalStateException(from.getFileName() + " has no plugin.yml name");
+        if (name == null) throw new IllegalStateException(from.getFileName() + " has no plugin.yml or paper-plugin.yml name");
         return name;
     }
 
