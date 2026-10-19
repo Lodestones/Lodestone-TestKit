@@ -30,7 +30,8 @@ import java.util.regex.Pattern;
  */
 final class ServerSession implements TestServer, AutoCloseable {
 
-    private static final Pattern PREFIX = Pattern.compile("^\\[\\d{2}:\\d{2}:\\d{2}(?: [A-Z]+)?]:? ?");
+    // 26.x prints console replies as "System chat: <message>".
+    private static final Pattern PREFIX = Pattern.compile("^\\[\\d{2}:\\d{2}:\\d{2}(?: [A-Z]+)?]:? ?(?:System chat: )?");
     private static final Pattern LEVEL = Pattern.compile("^\\[\\d{2}:\\d{2}:\\d{2} ([A-Z]+)]");
     private static final Pattern STACK = Pattern.compile("^(\\s+at |\\s*\\.\\.\\. \\d+ more|Caused by: |[a-zA-Z_$][\\w$]*(\\.[\\w$]+)+(Exception|Error)\\b)");
     private static final String LOCK_FILE = ".testkit-lock";
@@ -136,7 +137,8 @@ final class ServerSession implements TestServer, AutoCloseable {
     private void resetFiles() {
         List<String> root = panel.list(spec.uuid(), "/");
         // Player lists go too, so an op or ban from one run never leaks into the next.
-        List<String> wipe = new ArrayList<>(List.of("plugins", "logs", "crash-reports",
+        // .cache holds loader blobs, so a blob from an earlier run can never stand in for the build under test.
+        List<String> wipe = new ArrayList<>(List.of("plugins", ".cache", "logs", "crash-reports",
                 "ops.json", "whitelist.json", "banned-players.json", "banned-ips.json", "usercache.json"));
         if (!spec.isProxy()) wipe.addAll(List.of("world", "world_nether", "world_the_end"));
         wipe.retainAll(root);
@@ -211,6 +213,21 @@ final class ServerSession implements TestServer, AutoCloseable {
                 String clean = folder.startsWith("/") ? folder : "/" + folder;
                 createFolders(clean);
                 panel.upload(spec.uuid(), file, clean);
+            }
+
+            @Override
+            public void installLoader(String loader, String impl, String blobMagic) {
+                LoaderBundle bundle = LoaderBundle.of(single(loader), single(impl), blobMagic);
+                upload(bundle.loaderJar(), "plugins");
+                upload(bundle.blob(), ".cache");
+                writeFile("plugins/" + bundle.name() + "/config.yml",
+                        "loader_version: auto\nloader_channels: release\nauto_update_loader: false\n");
+            }
+
+            private Path single(String pluginSpec) {
+                List<Path> jars = PluginSource.resolve(pluginSpec, spec, config.cacheDir());
+                if (jars.size() != 1) throw new IllegalStateException("'" + pluginSpec + "' must be one jar, got " + jars);
+                return jars.getFirst();
             }
         };
         for (Method hook : key.hooks()) {
@@ -305,22 +322,27 @@ final class ServerSession implements TestServer, AutoCloseable {
         String cmd = command.startsWith("/") ? command.substring(1) : command;
         int mark = console.mark();
         console.send(cmd);
+        // The console echoes what was typed. Wings handles each socket message on its own, so two quick sends can
+        // reach stdin in either order: wait for this echo before sending anything else.
+        console.await(mark, l -> strip(l).equals(cmd), Duration.ofSeconds(5));
         List<String> out;
         if (spec.isProxy()) {
             awaitQuiet(Duration.ofMillis(1500), Duration.ofSeconds(10));
             out = console.since(mark);
         } else {
-            // An unknown command echoes itself back, so a unique one marks exactly where the output ends.
+            // An unknown command is answered with "<command><--[HERE]", so a unique one marks where the output ends.
+            // Its echo shows up before the server gets to it, so only the answer counts.
             String marker = "testkit-end-" + MARKERS.incrementAndGet();
+            String end = marker + "<--[HERE]";
             console.send(marker);
-            if (console.await(mark, l -> l.contains(marker), Duration.ofSeconds(30)) == null) {
+            if (console.await(mark, l -> l.contains(end), Duration.ofSeconds(30)) == null) {
                 throw new AssertionError("No response from " + spec.id() + " console after '" + cmd + "'");
             }
             out = console.since(mark);
-            int end = indexOfLast(out, marker);
-            out = new ArrayList<>(out.subList(0, end));
+            out = new ArrayList<>(out.subList(0, indexOfLast(out, end)));
             if (!out.isEmpty() && out.getLast().contains("Unknown or incomplete command")) out.removeLast();
         }
+        out = out.stream().filter(l -> !strip(l).equals(cmd) && !strip(l).startsWith("testkit-end-")).toList();
         return new CommandResult(cmd, out.stream().map(ServerSession::strip).filter(l -> !l.isBlank()).toList());
     }
 

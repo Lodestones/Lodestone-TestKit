@@ -20,7 +20,7 @@ public record CommandResult(String command, List<String> lines) {
 
     /** True when the server didn't recognise the command at all. */
     public boolean isUnknown() {
-        return lines.stream().anyMatch(l -> l.startsWith("Unknown or incomplete command") || l.equals("Unknown command."));
+        return lines.stream().anyMatch(l -> l.startsWith("Unknown or incomplete command") || l.startsWith("Unknown command"));
     }
 
     /** Fails the test if the command is unknown or printed an internal error. */
